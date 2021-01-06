@@ -1,0 +1,161 @@
+= Compile Samba From Source
+:toc: right
+:toclevels: 2
+:samba_home_url: https://www.samba.org
+:samba_req_pack_url: https://wiki.samba.org/index.php/Package_Dependencies_Required_to_Build_Samba
+:samba_download_url: https://download.samba.org/pub/samba/stable/
+:samba_fromsource_url: https://wiki.samba.org/index.php/Build_Samba_from_Source
+:samba_conf_options_url: https://vapour-apps.com/build-samba-4-9-from-source-on-debian-9-or-ubuntu-18-04/
+
+== Introduction
+
+This guide helps you to compile a particular {samba_home_url}[Samba] version from source which
+includes `smbclient`. This may be necessary if the provided version of your OS can not connect to
+a file server, in particular to older non Microsoft file servers.
+
+NOTE: The guide has been tested, is at it is and comes without any warranty.
+
+== Prerequisites
+
+=== Uninstalling `samba`
+
+If you have already installed `smbclient` provided by your server and you installed the `smbclient`
+extension from PECL (to support smbclient in PHP) you need to uninstall them first. Follow the
+steps described below to do so.
+
+NOTE: Copy your smb.conf or other configurations files you may want to keep to reuse them later on.
+Purging deletes the config files and helps to make a clean basis. 
+
+[source,console]
+----
+sudo pecl uninstall smbclient
+sudo apt purge smbclient
+sudo apt autoremove
+----
+
+=== Preparing the Installation Environment
+
+To compile Samba, you need to install necessary packages. Copy the referenced content from
+{samba_req_pack_url}[Bootstrap Dependencies Script] from Samba for Ubuntu 18.04 which can also
+be used for Ubuntu 20.04. You will find it in section _Verified Package Dependencies_. Post
+downloading, make the script executable and execute it (use the name how you called it). For your
+convenience, you can download the file
+link:{attachmentsdir}/installation/manual_installation/bootstrap.sh[bootstrap samba master] here.
+
+[source,console]
+----
+sudo ./bootstrap.sh
+----
+
+== Prepare Compiling Samba
+
+=== Download Your Copy of Samba
+
+The latest version of Samba, which had support for the client protocol `NT1` was version 4.10.18.
+In all versions above, this support was dropped and is not available anymore. If you need `NT1`
+support, download that version. You can chose any version that fits your needs.
+
+[source,console]
+----
+cd /tmp
+sudo wget https://download.samba.org/pub/samba/stable/samba-4.10.18.tar.gz
+----
+
+=== Extract Samba Sources
+
+[source,console]
+----
+sudo tar -xvf samba-4.10.18.tar.gz
+cd samba-4.10.18
+----
+
+== Compile Samba
+
+To compile Samba, you need three steps which are described in detail at
+{samba_fromsource_url}[Build Samba from Source]. The complete process takes some time.
+
+. `sudo ./configure` <options>
+. `sudo make` <options>
+. `sudo make install`
+
+=== Configuring the Installation
+
+The settings for the configuration options are important, so that Samba will be located and setup
+for Ubuntu properly. If you are planning to use Samba in your installation where your server
+_will act_ as domain controller and not only as a client, you can safely remove `--without-ad-dc`
+from the options below. Read more on details {samba_conf_options_url}[config options] for Ubuntu. 
+
+[source,console]
+----
+sudo ./configure \
+	--prefix=/usr \
+	--enable-fhs \
+	--sysconfdir=/etc \
+	--localstatedir=/var \
+	--with-privatedir=/var/lib/samba/private \
+	--with-smbpasswd-file=/etc/samba/smbpasswd \
+	--with-piddir=/var/run/samba \
+	--with-pammodulesdir=/lib/x86_64-linux-gnu/security \
+	--libdir=/usr/lib/x86_64-linux-gnu \
+	--with-modulesdir=/usr/lib/x86_64-linux-gnu/samba \
+	--datadir=/usr/share \
+	--with-lockdir=/var/run/samba \
+	--with-statedir=/var/lib/samba \
+	--with-cachedir=/var/cache/samba \
+	--with-socketpath=/var/run/ctdb/ctdbd.socket \
+	--with-logdir=/var/log/ctdb \
+	--systemd-install-services \
+	--without-ad-dc
+----
+
+=== Start the Compilation
+
+Start the compilation with following command. You can set options to run multiple jobs in parallel
+by adding `-j <n>`. This results in a higher CPU utilisation and reduces the time needed. In the
+example below, four jobs are enabled to utilisize the 4 cores of the CPU available.
+
+[source,console]
+----
+sudo make -j 4
+----
+
+=== Install the Compiled Software
+
+To install the compiled software run following command:
+
+[source,console]
+----
+sudo make install
+----
+
+== Testing
+
+When the installation has completed, test your result. If you have used a `smb.conf` file before,
+copy it back to its original location (`/etc/samba/`).
+
+[source,console]
+----
+sudo smbclient --version
+Version 4.10.18
+----
+
+[source,console]
+----
+sudo smbclient -L <file_server_name> -U <full_domain_name>/<user_name>
+----
+
+You now should get a proper response with a directory listing.
+
+== Reinstalling Pecl smbclient
+
+If you had removed `pecl smbcient` before, you can reinstall it now with:
+
+[source,console]
+----
+sudo pecl channel-update pecl.php.net
+sudo pecl install smbclient
+----
+
+== Restart Services
+ 
+Restart your Web Server and/or `php-fpm` when everything is finished.
